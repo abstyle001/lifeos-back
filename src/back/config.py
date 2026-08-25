@@ -17,6 +17,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
     seed_demo: bool = True
+    auto_create_tables: bool = True
 
 
 @lru_cache

@@ -18,6 +18,7 @@ dependencies = [
 
 [project.scripts]
 back = "back.main:main"
+init-db = "back.init_db:main"
 
 [dependency-groups]
 dev = [
