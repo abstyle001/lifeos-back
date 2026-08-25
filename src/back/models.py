@@ -1,0 +1,75 @@
+from __future__ import annotations
+
+from datetime import date, datetime
+
+from sqlalchemy import (
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from .database import Base
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    avatar: Mapped[str | None] = mapped_column(String(255), default=None)
+    level: Mapped[int] = mapped_column(Integer, default=1)
+    experience: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    records: Mapped[list[DailyRecord]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    achievements: Mapped[list[Achievement]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class DailyRecord(Base):
+    __tablename__ = "daily_records"
+    __table_args__ = (UniqueConstraint("user_id", "date", name="uq_record_user_date"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    date: Mapped[date] = mapped_column(Date, index=True)
+    sleep: Mapped[float] = mapped_column(Float, default=0)  # 小时
+    study_time: Mapped[float] = mapped_column(Float, default=0)  # 小时
+    exercise: Mapped[float] = mapped_column(Float, default=0)  # 小时
+    mood: Mapped[int] = mapped_column(Integer, default=0)  # 1-10
+    focus: Mapped[int] = mapped_column(Integer, default=0)  # 1-10
+    reading_count: Mapped[int] = mapped_column(Integer, default=0)  # 本
+    skill_time: Mapped[float] = mapped_column(Float, default=0)  # 小时
+    diet: Mapped[int] = mapped_column(Integer, default=0)  # 1-10
+    stress: Mapped[int] = mapped_column(Integer, default=0)  # 1-10
+    energy: Mapped[int] = mapped_column(Integer, default=0)  # 1-10
+    tasks_completed: Mapped[int] = mapped_column(Integer, default=0)
+    tasks_total: Mapped[int] = mapped_column(Integer, default=0)
+    note: Mapped[str | None] = mapped_column(String(500), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="records")
+
+
+class Achievement(Base):
+    __tablename__ = "achievements"
+    __table_args__ = (UniqueConstraint("user_id", "code", name="uq_achievement_user_code"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    code: Mapped[str] = mapped_column(String(50))
+    title: Mapped[str] = mapped_column(String(100))
+    description: Mapped[str] = mapped_column(String(255))
+    unlocked_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="achievements")
