@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "LifeOS"
-    database_url: str = "sqlite:///./lifeos.db"
+    database_url: str = "postgresql+psycopg://lifeos:lifeos@localhost:5432/lifeos"
     secret_key: str = "dev-secret-key-change-me-in-production"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 天
     cors_origins: list[str] = [
