@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -69,3 +69,24 @@ def list_records(
     if to_date:
         stmt = stmt.where(DailyRecord.date <= to_date)
     return list(db.scalars(stmt))
+
+
+@router.delete("/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_record(
+    record_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current: Annotated[User, Depends(get_current_user)],
+) -> Response:
+    record = db.scalar(
+        select(DailyRecord).where(
+            DailyRecord.id == record_id, DailyRecord.user_id == current.id
+        )
+    )
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="记录不存在")
+
+    db.delete(record)
+    db.flush()
+    _recalc_xp(db, current)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

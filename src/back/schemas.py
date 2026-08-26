@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # --- Auth ---
@@ -42,7 +43,13 @@ class RecordIn(BaseModel):
     energy: int = Field(ge=0, le=10)
     tasks_completed: int = Field(ge=0)
     tasks_total: int = Field(ge=0)
-    note: str | None = None
+    note: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_task_progress(self) -> Self:
+        if self.tasks_completed > self.tasks_total:
+            raise ValueError("已完成任务数不能大于总任务数")
+        return self
 
 
 class RecordOut(BaseModel):
