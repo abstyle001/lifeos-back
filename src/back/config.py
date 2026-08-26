@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     ]
     seed_demo: bool = True
     auto_create_tables: bool = True
+    # AI 教练（OpenAI 兼容接口）
+    ai_base_url: str = ""
+    ai_api_key: str = ""
+    ai_model: str = ""
+    ai_timeout_seconds: float = 20.0
 
 
 @lru_cache

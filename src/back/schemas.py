@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -119,3 +119,66 @@ class AchievementOut(BaseModel):
 class AchievementsOut(BaseModel):
     unlocked: list[AchievementOut]
     locked: list[AchievementOut]
+
+
+# --- AI ---
+class ReportItem(BaseModel):
+    title: str
+    detail: str
+
+
+class MetricStat(BaseModel):
+    key: str
+    label: str
+    unit: str
+    current: float
+    previous: float
+    delta: float
+    delta_pct: float
+
+
+class WeeklyStats(BaseModel):
+    days_recorded: int
+    previous_days_recorded: int
+    total_days: int
+    streak: int
+    level: int
+    experience: int
+    attributes: Attributes
+    metrics: list[MetricStat]
+
+
+class AiReportContent(BaseModel):
+    """LLM 输出契约（仅 services/ai.py 内部使用）。字段/类型不符即触发 fallback。"""
+
+    summary: str = ""
+    highlights: list[ReportItem] = []
+    concerns: list[ReportItem] = []
+    suggestions: list[ReportItem] = []
+    next_goal: str = ""
+
+
+class WeeklyReportOut(BaseModel):
+    generated_at: datetime
+    week_start: date
+    week_end: date
+    stats: WeeklyStats
+    summary: str
+    highlights: list[ReportItem]
+    concerns: list[ReportItem]
+    suggestions: list[ReportItem]
+    next_goal: str
+    source: Literal["ai", "fallback"]
+
+
+class ChatMessageIn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class ChatIn(BaseModel):
+    messages: list[ChatMessageIn]
+
+
+class ChatOut(BaseModel):
+    reply: str
