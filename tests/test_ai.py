@@ -4,7 +4,7 @@ import httpx
 
 from back.config import Settings
 from back.models import DailyRecord
-from back.schemas import Attributes, ChatMessageIn, MetricStat, WeeklyStats
+from back.schemas import AiReportContent, Attributes, ChatMessageIn, MetricStat, WeeklyStats
 from back.services.ai import (
     _call_ai,
     _parse_json_object,
@@ -215,7 +215,10 @@ def test_call_ai_request_shape(monkeypatch):
 
     monkeypatch.setattr("back.services.ai.httpx.Client", FakeClient)
     settings = Settings(
-        ai_base_url="https://example.com/v1", ai_model="m", ai_api_key="k"
+        ai_base_url="https://example.com/v1",
+        ai_model="m",
+        ai_api_key="k",
+        ai_timeout_seconds=20.0,
     )
     result = _call_ai("prompt", settings)
 
@@ -300,3 +303,56 @@ def test_chat_returns_text(monkeypatch):
     settings = Settings(ai_base_url="https://example.com/v1", ai_model="m")
     messages = [ChatMessageIn(role="user", content="我最近睡眠不好怎么办？")]
     assert chat(messages, "数据上下文", settings) == "你好！"
+
+
+def test_weekly_stats_requires_auth(client):
+    r = client.get("/api/ai/weekly-stats")
+    assert r.status_code == 401
+
+
+def test_weekly_stats_endpoint(client):
+    h = _auth_headers(client)
+    today = date.today()
+    client.post("/api/records", headers=h, json=_record_payload(today))
+
+    r = client.get("/api/ai/weekly-stats", headers=h)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["week_start"] == (today - timedelta(days=6)).isoformat()
+    assert body["week_end"] == today.isoformat()
+    assert body["stats"]["days_recorded"] == 1
+    assert set(body["stats"]["attributes"].keys()) == {"INT", "VIT", "FOCUS", "CHA"}
+
+
+def test_weekly_report_cached(monkeypatch, client):
+    h = _auth_headers(client)
+    client.post("/api/records", headers=h, json=_record_payload(date.today()))
+
+    calls = {"n": 0}
+
+    def fake_generate(stats, week_start, week_end, settings=None):
+        calls["n"] += 1
+        return (
+            AiReportContent(
+                summary="缓存测试",
+                suggestions=[{"title": "建议", "detail": "详情"}],
+                next_goal="目标",
+            ),
+            "ai",
+        )
+
+    monkeypatch.setattr("back.routers.ai.generate_report", fake_generate)
+
+    r1 = client.get("/api/ai/weekly-report", headers=h)
+    assert r1.status_code == 200
+    assert r1.json()["source"] == "ai"
+    assert r1.json()["summary"] == "缓存测试"
+    assert calls["n"] == 1
+
+    r2 = client.get("/api/ai/weekly-report", headers=h)
+    assert r2.json()["summary"] == "缓存测试"
+    assert calls["n"] == 1  # 命中缓存，未重新生成
+
+    r3 = client.get("/api/ai/weekly-report?refresh=true", headers=h)
+    assert r3.status_code == 200
+    assert calls["n"] == 2  # 强制重新生成

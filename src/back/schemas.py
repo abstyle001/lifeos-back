@@ -176,6 +176,12 @@ class ChatMessageIn(BaseModel):
     content: str
 
 
+class WeeklyStatsOut(BaseModel):
+    week_start: date
+    week_end: date
+    stats: WeeklyStats
+
+
 class ChatIn(BaseModel):
     messages: list[ChatMessageIn]
 

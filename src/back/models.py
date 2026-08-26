@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -32,6 +33,9 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan"
     )
     achievements: Mapped[list[Achievement]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    ai_report_caches: Mapped[list[AiReportCache]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -73,3 +77,24 @@ class Achievement(Base):
     unlocked_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="achievements")
+
+
+class AiReportCache(Base):
+    """AI 周报缓存：同用户同一天（week_end）只生成一次，节省模型额度。"""
+
+    __tablename__ = "ai_report_cache"
+    __table_args__ = (UniqueConstraint("user_id", "week_end", name="uq_ai_report_user_week"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    week_start: Mapped[date] = mapped_column(Date)
+    week_end: Mapped[date] = mapped_column(Date, index=True)
+    summary: Mapped[str] = mapped_column(Text)
+    highlights: Mapped[str] = mapped_column(Text)  # JSON 数组
+    concerns: Mapped[str] = mapped_column(Text)  # JSON 数组
+    suggestions: Mapped[str] = mapped_column(Text)  # JSON 数组
+    next_goal: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(20))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="ai_report_caches")

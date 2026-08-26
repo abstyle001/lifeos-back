@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import httpx
 from pydantic import ValidationError
+from sqlalchemy import select
 
 from ..config import Settings, get_settings
-from ..models import DailyRecord
+from ..models import AiReportCache, DailyRecord
 from ..schemas import (
     AiReportContent,
     Attributes,
@@ -345,3 +346,65 @@ def generate_report(
         return AiReportContent.model_validate(parsed), "ai"
     except ValidationError:
         return _build_fallback(stats), "fallback"
+
+
+def get_cached_report(
+    db, user_id: int, week_end: date
+) -> tuple[AiReportContent, str, datetime] | None:
+    row = db.scalar(
+        select(AiReportCache).where(
+            AiReportCache.user_id == user_id,
+            AiReportCache.week_end == week_end,
+        )
+    )
+    if row is None:
+        return None
+    content = AiReportContent(
+        summary=row.summary,
+        highlights=[ReportItem(**x) for x in json.loads(row.highlights)],
+        concerns=[ReportItem(**x) for x in json.loads(row.concerns)],
+        suggestions=[ReportItem(**x) for x in json.loads(row.suggestions)],
+        next_goal=row.next_goal,
+    )
+    return content, row.source, row.created_at
+
+
+def upsert_report_cache(
+    db,
+    user_id: int,
+    week_start: date,
+    week_end: date,
+    content: AiReportContent,
+    source: str,
+) -> None:
+    row = db.scalar(
+        select(AiReportCache).where(
+            AiReportCache.user_id == user_id,
+            AiReportCache.week_end == week_end,
+        )
+    )
+    highlights = json.dumps([h.model_dump() for h in content.highlights], ensure_ascii=False)
+    concerns = json.dumps([c.model_dump() for c in content.concerns], ensure_ascii=False)
+    suggestions = json.dumps([s.model_dump() for s in content.suggestions], ensure_ascii=False)
+    if row is None:
+        db.add(
+            AiReportCache(
+                user_id=user_id,
+                week_start=week_start,
+                week_end=week_end,
+                summary=content.summary,
+                highlights=highlights,
+                concerns=concerns,
+                suggestions=suggestions,
+                next_goal=content.next_goal,
+                source=source,
+            )
+        )
+    else:
+        row.week_start = week_start
+        row.summary = content.summary
+        row.highlights = highlights
+        row.concerns = concerns
+        row.suggestions = suggestions
+        row.next_goal = content.next_goal
+        row.source = source
