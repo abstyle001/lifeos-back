@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .database import Base, engine
-from .routers import achievements, ai, auth, dashboard, records
+from .routers import achievements, ai, auth, dashboard, records, social
 from .seed import run_seed
 
 settings = get_settings()
@@ -37,6 +37,7 @@ app.include_router(records.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(achievements.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
+app.include_router(social.router, prefix="/api")
 
 
 @app.get("/api/health")

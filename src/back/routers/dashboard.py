@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import DailyRecord, User
+from ..models import DailyRecord, SocialInteraction, User
 from ..schemas import (
     Attributes,
     DashboardOut,
@@ -39,7 +39,14 @@ def dashboard(
     today = date.today()
     today_record = next((r for r in records if r.date == today), None)
 
-    attributes = compute_attributes(records)
+    social = list(
+        db.scalars(
+            select(SocialInteraction)
+            .where(SocialInteraction.user_id == current.id)
+            .order_by(SocialInteraction.date)
+        )
+    )
+    attributes = compute_attributes(records, social)
     streak = calc_streak(records, today)
     trend = [
         TrendPoint(date=r.date, study_time=r.study_time, sleep=r.sleep, exercise=r.exercise)

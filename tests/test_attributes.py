@@ -1,6 +1,6 @@
 from datetime import date
 
-from back.models import DailyRecord
+from back.models import DailyRecord, SocialInteraction
 from back.services.attributes import compute_attributes, today_score
 
 
@@ -43,3 +43,14 @@ def test_more_sleep_exercise_raises_vit():
 def test_today_score_range():
     assert 0 <= today_score(_rec()) <= 100
     assert today_score(_rec(focus=0, mood=0, energy=0, stress=10)) < 50
+
+
+def test_cha_uses_social_when_present():
+    records = [_rec() for _ in range(3)]
+    empty_social = [
+        SocialInteraction(
+            user_id=1, date=date(2026, 8, 1), interactions=0, social_time=0, quality=0
+        )
+    ]
+    # 有社交记录时 CHA 走社交公式（基线 30），而非情绪/精力/压力代理（更高）
+    assert compute_attributes(records, empty_social)["CHA"] < compute_attributes(records)["CHA"]

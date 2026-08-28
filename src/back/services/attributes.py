@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..models import DailyRecord
+from ..models import DailyRecord, SocialInteraction
 
 
 def _clamp(value: float, low: int = 0, high: int = 100) -> int:
@@ -11,10 +11,14 @@ def _avg(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
-def compute_attributes(records: list[DailyRecord]) -> dict[str, int]:
+def compute_attributes(
+    records: list[DailyRecord],
+    social_records: list[SocialInteraction] | None = None,
+) -> dict[str, int]:
     """由最近记录聚合出 RPG 属性（0-100）。空记录返回基线值。
 
     初始公式，集中在此便于后续调参；前端不做任何硬编码。
+    CHA 在有真实社交记录时由社交数据计算，否则退化为情绪/精力/压力代理。
     """
     recent = records[-14:] if len(records) > 14 else records
     if not recent:
@@ -34,8 +38,18 @@ def compute_attributes(records: list[DailyRecord]) -> dict[str, int]:
     INT = _clamp(30 + _avg(study) * 6 + _avg(skill) * 5 + _avg(reading) * 4)
     VIT = _clamp(30 + _avg(sleep) * 6 + _avg(exercise) * 5 + _avg(diet) * 4)
     FOCUS = _clamp(30 + _avg(focus) * 8 - _avg(stress) * 2 + (5 if _avg(study) >= 2 else 0))
-    # CHA：社交数据暂缺，用情绪/精力/压力代理（占位，后续可接入真实社交指标）。
-    CHA = _clamp(30 + _avg(mood) * 8 + _avg(energy) * 6 - _avg(stress) * 2)
+
+    if social_records:
+        recent_social = social_records[-14:] if len(social_records) > 14 else social_records
+        if recent_social:
+            interactions = [s.interactions for s in recent_social]
+            social_time = [s.social_time for s in recent_social]
+            quality = [s.quality for s in recent_social]
+            CHA = _clamp(30 + _avg(interactions) * 6 + _avg(social_time) * 3 + _avg(quality) * 4)
+        else:
+            CHA = _clamp(30 + _avg(mood) * 8 + _avg(energy) * 6 - _avg(stress) * 2)
+    else:
+        CHA = _clamp(30 + _avg(mood) * 8 + _avg(energy) * 6 - _avg(stress) * 2)
 
     return {"INT": INT, "VIT": VIT, "FOCUS": FOCUS, "CHA": CHA}
 

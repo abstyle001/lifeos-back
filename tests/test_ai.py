@@ -250,19 +250,13 @@ def test_call_ai_timeout_returns_none(monkeypatch):
 
 
 def test_chat_requires_auth(client):
-    r = client.post(
-        "/api/ai/chat", json={"messages": [{"role": "user", "content": "你好"}]}
-    )
+    r = client.post("/api/ai/chat", json={"message": "你好"})
     assert r.status_code == 401
 
 
 def test_chat_unconfigured_returns_503(client):
     h = _auth_headers(client)
-    r = client.post(
-        "/api/ai/chat",
-        headers=h,
-        json={"messages": [{"role": "user", "content": "你好"}]},
-    )
+    r = client.post("/api/ai/chat", headers=h, json={"message": "你好"})
     assert r.status_code == 503
 
 
@@ -279,11 +273,7 @@ def test_chat_endpoint_success(monkeypatch, client):
         lambda messages, context, settings: "试试睡前 1 小时放下手机。",
     )
 
-    r = client.post(
-        "/api/ai/chat",
-        headers=h,
-        json={"messages": [{"role": "user", "content": "睡眠不好怎么办"}]},
-    )
+    r = client.post("/api/ai/chat", headers=h, json={"message": "睡眠不好怎么办"})
     assert r.status_code == 200
     assert r.json()["reply"] == "试试睡前 1 小时放下手机。"
 
@@ -356,3 +346,51 @@ def test_weekly_report_cached(monkeypatch, client):
     r3 = client.get("/api/ai/weekly-report?refresh=true", headers=h)
     assert r3.status_code == 200
     assert calls["n"] == 2  # 强制重新生成
+
+
+def test_chat_persists_history(monkeypatch, client):
+    h = _auth_headers(client)
+    client.post("/api/records", headers=h, json=_record_payload(date.today()))
+
+    monkeypatch.setattr(
+        "back.routers.ai.get_settings",
+        lambda: Settings(ai_base_url="https://example.com/v1", ai_model="m"),
+    )
+    monkeypatch.setattr(
+        "back.routers.ai.ai_chat",
+        lambda messages, context, settings: "试试睡前 1 小时放下手机。",
+    )
+
+    client.post("/api/ai/chat", headers=h, json={"message": "睡眠不好怎么办"})
+
+    history = client.get("/api/ai/chat/messages", headers=h).json()
+    assert len(history) == 2
+    assert history[0] == {"role": "user", "content": "睡眠不好怎么办"}
+    assert history[1] == {"role": "assistant", "content": "试试睡前 1 小时放下手机。"}
+
+
+def test_monthly_stats_endpoint(client):
+    h = _auth_headers(client)
+    today = date.today()
+    client.post("/api/records", headers=h, json=_record_payload(today))
+
+    r = client.get("/api/ai/monthly-stats", headers=h)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["month_start"] == today.replace(day=1).isoformat()
+    assert body["month_end"] == today.isoformat()
+    assert body["stats"]["days_recorded"] >= 1
+    assert set(body["stats"]["attributes"].keys()) == {"INT", "VIT", "FOCUS", "CHA"}
+
+
+def test_monthly_report_fallback(client):
+    h = _auth_headers(client)
+    today = date.today()
+    client.post("/api/records", headers=h, json=_record_payload(today))
+
+    r = client.get("/api/ai/monthly-report", headers=h)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["source"] == "fallback"
+    assert body["summary"]
+    assert body["month_start"] == today.replace(day=1).isoformat()

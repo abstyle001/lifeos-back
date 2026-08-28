@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
-from .models import DailyRecord, User
+from .models import DailyRecord, SocialInteraction, User
 from .security import hash_password
 from .services.achievements import check_and_unlock
 from .services.experience import level_for_xp, record_xp
@@ -50,6 +50,15 @@ def seed(db: Session) -> None:
         )
         db.add(record)
         total_xp += record_xp(record)
+
+        social = SocialInteraction(
+            user_id=user.id,
+            date=day,
+            interactions=round(rng.uniform(0, 2) + progress * 3),
+            social_time=round(rng.uniform(0.0, 1.0) + progress * 1.5, 1),
+            quality=rng.randint(4, 9),
+        )
+        db.add(social)
 
     user.experience = total_xp
     user.level = level_for_xp(total_xp)

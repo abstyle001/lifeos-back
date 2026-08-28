@@ -72,6 +72,24 @@ class RecordOut(BaseModel):
     note: str | None
 
 
+# --- Social ---
+class SocialIn(BaseModel):
+    date: date
+    interactions: int = Field(ge=0, le=50)
+    social_time: float = Field(ge=0, le=24)
+    quality: int = Field(ge=0, le=10)
+
+
+class SocialOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    date: date
+    interactions: int
+    social_time: float
+    quality: int
+
+
 # --- Attributes / dashboard ---
 class Attributes(BaseModel):
     INT: int
@@ -182,8 +200,34 @@ class WeeklyStatsOut(BaseModel):
     stats: WeeklyStats
 
 
+class MonthlyStatsOut(BaseModel):
+    month_start: date
+    month_end: date
+    stats: WeeklyStats
+
+
+class MonthlyReportOut(BaseModel):
+    generated_at: datetime
+    month_start: date
+    month_end: date
+    stats: WeeklyStats
+    summary: str
+    highlights: list[ReportItem]
+    concerns: list[ReportItem]
+    suggestions: list[ReportItem]
+    next_goal: str
+    source: Literal["ai", "fallback"]
+
+
 class ChatIn(BaseModel):
-    messages: list[ChatMessageIn]
+    message: str = Field(min_length=1, max_length=4000)
+
+
+class ChatMessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    role: Literal["user", "assistant"]
+    content: str
 
 
 class ChatOut(BaseModel):

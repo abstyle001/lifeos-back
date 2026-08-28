@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 
 from ..config import Settings, get_settings
-from ..models import AiReportCache, DailyRecord
+from ..models import AiReportCache, DailyRecord, SocialInteraction
 from ..schemas import (
     AiReportContent,
     Attributes,
@@ -85,24 +85,40 @@ CHAT_SYSTEM_PROMPT = """你是 LifeOS 的个人 AI 教练，友好、务实、�
 4. 保持鼓励、不评判的语气。"""
 
 
-def build_weekly_stats(
-    records: list[DailyRecord], today: date, level: int, experience: int
-) -> WeeklyStats:
-    """由全部记录计算本周/上周统计（纯函数，无 IO）。"""
-    current_recs = [r for r in records if today - timedelta(days=6) <= r.date <= today]
-    previous_recs = [
-        r
-        for r in records
-        if today - timedelta(days=13) <= r.date <= today - timedelta(days=7)
-    ]
+SYSTEM_PROMPT_MONTHLY = """你是一名专业、客观、务实的个人成长教练，擅长根据用户的生活数据给出具体、可执行的建议，语气友好、鼓励但不空洞。
 
-    def avg(recs: list[DailyRecord], key: str) -> float:
-        return round(sum(getattr(r, key) for r in recs) / len(recs), 2) if recs else 0.0
+你将收到用户本月与上月的生活数据统计，包含：本月日均、上月日均、变化幅度、当前 RPG 属性、连续打卡天数、等级与经验。
 
+你必须只输出一个 JSON 对象，不要输出任何多余文字、解释、前后缀或 Markdown 代码块。JSON 结构必须严格如下：
+
+{
+  "summary": "本月总结（2-3 句话，引用具体数字，客观友好）",
+  "highlights": [{"title": "亮点标题", "detail": "亮点说明（1-2 句）"}],
+  "concerns": [{"title": "问题标题", "detail": "问题说明（1-2 句，引用数据）"}],
+  "suggestions": [{"title": "建议标题", "detail": "具体可执行建议（1-2 句）"}],
+  "next_goal": "下月一个具体、可衡量的目标（一句话）"
+}
+
+规则：
+1. highlights 1-3 条；concerns 1-3 条；suggestions 2-4 条。
+2. 所有文字使用简体中文。
+3. 引用的数字必须来自输入数据，禁止编造。
+4. 建议必须具体可执行（如每天多少分钟、每周几次），避免"多运动""早点睡"这类空泛表述。
+5. 压力（stress）越高越差，其余指标越高越好，判断变化方向时注意。
+6. 若本月没有任何记录（days_recorded 为 0），summary 写"本月还没有记录"，highlights 与 concerns 返回空数组，suggestions 给出如何开始记录的建议。"""
+
+
+def _avg(recs: list[DailyRecord], key: str) -> float:
+    return round(sum(getattr(r, key) for r in recs) / len(recs), 2) if recs else 0.0
+
+
+def _compute_metrics(
+    current_recs: list[DailyRecord], previous_recs: list[DailyRecord]
+) -> list[MetricStat]:
     metrics = []
     for key, label, unit in METRICS:
-        cur = avg(current_recs, key)
-        prev = avg(previous_recs, key)
+        cur = _avg(current_recs, key)
+        prev = _avg(previous_recs, key)
         delta = round(cur - prev, 2)
         delta_pct = round(delta / prev * 100, 1) if prev else 0.0
         metrics.append(
@@ -116,8 +132,18 @@ def build_weekly_stats(
                 delta_pct=delta_pct,
             )
         )
+    return metrics
 
-    attrs = compute_attributes(records)
+
+def _stats_payload(
+    records: list[DailyRecord],
+    today: date,
+    level: int,
+    experience: int,
+    social_records: list[SocialInteraction] | None,
+    current_recs: list[DailyRecord],
+    previous_recs: list[DailyRecord],
+) -> WeeklyStats:
     return WeeklyStats(
         days_recorded=len(current_recs),
         previous_days_recorded=len(previous_recs),
@@ -125,8 +151,57 @@ def build_weekly_stats(
         streak=calc_streak(records, today),
         level=level,
         experience=experience,
-        attributes=Attributes(**attrs),
-        metrics=metrics,
+        attributes=Attributes(**compute_attributes(records, social_records)),
+        metrics=_compute_metrics(current_recs, previous_recs),
+    )
+
+
+def build_weekly_stats(
+    records: list[DailyRecord],
+    today: date,
+    level: int,
+    experience: int,
+    social_records: list[SocialInteraction] | None = None,
+) -> WeeklyStats:
+    """由全部记录计算本周/上周统计（纯函数，无 IO）。"""
+    current_recs = [r for r in records if today - timedelta(days=6) <= r.date <= today]
+    previous_recs = [
+        r
+        for r in records
+        if today - timedelta(days=13) <= r.date <= today - timedelta(days=7)
+    ]
+    return _stats_payload(
+        records, today, level, experience, social_records, current_recs, previous_recs
+    )
+
+
+def _month_start(d: date) -> date:
+    return d.replace(day=1)
+
+
+def _previous_month_window(d: date) -> tuple[date, date]:
+    """上月同期窗口：与「本月 1 日到 d」相同天数的上月区间。"""
+    first = d.replace(day=1)
+    prev_last = first - timedelta(days=1)
+    prev_first = prev_last.replace(day=1)
+    prev_end = prev_last.replace(day=min(d.day, prev_last.day))
+    return prev_first, prev_end
+
+
+def build_monthly_stats(
+    records: list[DailyRecord],
+    today: date,
+    level: int,
+    experience: int,
+    social_records: list[SocialInteraction] | None = None,
+) -> WeeklyStats:
+    """由全部记录计算本月 vs 上月同期统计（纯函数，无 IO）。"""
+    month_start = today.replace(day=1)
+    current_recs = [r for r in records if month_start <= r.date <= today]
+    prev_start, prev_end = _previous_month_window(today)
+    previous_recs = [r for r in records if prev_start <= r.date <= prev_end]
+    return _stats_payload(
+        records, today, level, experience, social_records, current_recs, previous_recs
     )
 
 
@@ -142,6 +217,22 @@ def build_prompt(stats: WeeklyStats, week_start: date, week_end: date) -> tuple[
         + "\n\n请根据以上数据生成周报。"
     )
     return SYSTEM_PROMPT, user
+
+
+def build_monthly_prompt(
+    stats: WeeklyStats, month_start: date, month_end: date
+) -> tuple[str, str]:
+    payload = {
+        "month_start": month_start.isoformat(),
+        "month_end": month_end.isoformat(),
+        "stats": stats.model_dump(),
+    }
+    user = (
+        "以下是用户本月与上月的数据统计（JSON）：\n"
+        + json.dumps(payload, ensure_ascii=False, indent=2)
+        + "\n\n请根据以上数据生成月报。"
+    )
+    return SYSTEM_PROMPT_MONTHLY, user
 
 
 def build_chat_context(stats: WeeklyStats) -> str:
@@ -221,11 +312,13 @@ def _post(url: str, headers: dict, body: dict, timeout: float) -> str | None:
         return None
 
 
-def _call_ai(user_prompt: str, settings: Settings) -> dict | None:
+def _call_ai(
+    user_prompt: str, settings: Settings, system_prompt: str = SYSTEM_PROMPT
+) -> dict | None:
     url, headers, body = _completion_request(
         settings,
         [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.4,
@@ -251,10 +344,53 @@ def chat(
     return content.strip() if content else None
 
 
-def _build_fallback(stats: WeeklyStats) -> AiReportContent:
+def chat_stream(
+    messages: list[ChatMessageIn], context: str, settings: Settings
+):
+    """流式调用聊天接口，逐段 yield 回复文本；异常时静默结束（由调用方兜底）。"""
+    system = CHAT_SYSTEM_PROMPT.format(context=context)
+    url, headers, body = _completion_request(
+        settings,
+        [{"role": "system", "content": system}]
+        + [{"role": m.role, "content": m.content} for m in messages],
+        temperature=0.7,
+    )
+    body = {**body, "stream": True}
+    try:
+        with httpx.stream(
+            "POST", url, json=body, headers=headers, timeout=settings.ai_timeout_seconds
+        ) as resp:
+            resp.raise_for_status()
+            for line in resp.iter_lines():
+                line = line.strip()
+                if not line or not line.startswith("data:"):
+                    continue
+                data = line[5:].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    obj = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+                choices = obj.get("choices") or []
+                if not choices:
+                    continue
+                delta = choices[0].get("delta", {}).get("content")
+                if delta:
+                    yield delta
+    except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError):
+        return
+
+
+def _build_fallback(
+    stats: WeeklyStats,
+    current_label: str = "本周",
+    next_label: str = "下周",
+    prev_label: str = "上周",
+) -> AiReportContent:
     if stats.total_days == 0:
         return AiReportContent(
-            summary="本周还没有记录任何数据，欢迎开启你的成长之旅。",
+            summary=f"{current_label}还没有记录任何数据，欢迎开启你的成长之旅。",
             suggestions=[
                 ReportItem(
                     title="开始记录",
@@ -295,15 +431,18 @@ def _build_fallback(stats: WeeklyStats) -> AiReportContent:
         suggestions.append(
             ReportItem(
                 title=f"改善{declined.label}",
-                detail=f"优先恢复{declined.label}，可从每天小幅增加开始，逐步回到上周水平。",
+                detail=f"优先恢复{declined.label}，可从每天小幅增加开始，逐步回到{prev_label}水平。",
             )
         )
     if not suggestions:
         suggestions.append(
-            ReportItem(title="保持节奏", detail="各项指标与上周基本持平，继续保持当前节奏。")
+            ReportItem(
+                title="保持节奏",
+                detail=f"各项指标与{prev_label}基本持平，继续保持当前节奏。",
+            )
         )
 
-    parts = [f"本周共记录 {stats.days_recorded} 天"]
+    parts = [f"{current_label}共记录 {stats.days_recorded} 天"]
     if improved and improved.delta_pct > 0:
         parts.append(f"{improved.label}进步最明显")
     if declined and declined.delta_pct < 0:
@@ -311,9 +450,9 @@ def _build_fallback(stats: WeeklyStats) -> AiReportContent:
     summary = "，".join(parts) + "。"
 
     if declined and declined.delta_pct < 0:
-        next_goal = f"下周把{declined.label}恢复到上周水平"
-    elif improved:
-        next_goal = f"下周继续稳定{improved.label}的上升势头"
+        next_goal = f"{next_label}把{declined.label}恢复到{prev_label}水平"
+    elif improved and improved.delta_pct > 0:
+        next_goal = f"{next_label}继续稳定{improved.label}的上升势头"
     else:
         next_goal = "保持当前节奏，坚持每日记录"
 
@@ -346,6 +485,28 @@ def generate_report(
         return AiReportContent.model_validate(parsed), "ai"
     except ValidationError:
         return _build_fallback(stats), "fallback"
+
+
+def generate_monthly_report(
+    stats: WeeklyStats,
+    month_start: date,
+    month_end: date,
+    settings: Settings | None = None,
+) -> tuple[AiReportContent, str]:
+    if settings is None:
+        settings = get_settings()
+    if stats.total_days == 0:
+        return _build_fallback(stats, "本月", "下月", "上月"), "fallback"
+    if not (settings.ai_base_url and settings.ai_model):
+        return _build_fallback(stats, "本月", "下月", "上月"), "fallback"
+    _, user_prompt = build_monthly_prompt(stats, month_start, month_end)
+    parsed = _call_ai(user_prompt, settings, system_prompt=SYSTEM_PROMPT_MONTHLY)
+    if parsed is None:
+        return _build_fallback(stats, "本月", "下月", "上月"), "fallback"
+    try:
+        return AiReportContent.model_validate(parsed), "ai"
+    except ValidationError:
+        return _build_fallback(stats, "本月", "下月", "上月"), "fallback"
 
 
 def get_cached_report(

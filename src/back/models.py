@@ -38,6 +38,12 @@ class User(Base):
     ai_report_caches: Mapped[list[AiReportCache]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    social_interactions: Mapped[list[SocialInteraction]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    chat_messages: Mapped[list[ChatMessage]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class DailyRecord(Base):
@@ -98,3 +104,34 @@ class AiReportCache(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="ai_report_caches")
+
+
+class SocialInteraction(Base):
+    """每日社交互动记录，作为 CHA 属性的真实数据来源（替换情绪/精力/压力代理）。"""
+
+    __tablename__ = "social_interactions"
+    __table_args__ = (UniqueConstraint("user_id", "date", name="uq_social_user_date"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    date: Mapped[date] = mapped_column(Date, index=True)
+    interactions: Mapped[int] = mapped_column(Integer, default=0)  # 有意义互动次数
+    social_time: Mapped[float] = mapped_column(Float, default=0)  # 社交时长（小时）
+    quality: Mapped[int] = mapped_column(Integer, default=0)  # 社交质量 0-10
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="social_interactions")
+
+
+class ChatMessage(Base):
+    """AI 教练对话历史（用户消息 + 助手回复），跨页面持久化。"""
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    role: Mapped[str] = mapped_column(String(20))  # "user" | "assistant"
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="chat_messages")
