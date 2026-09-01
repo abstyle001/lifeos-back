@@ -226,6 +226,7 @@ def test_call_ai_request_shape(monkeypatch):
     assert captured["url"] == "https://example.com/v1/chat/completions"
     assert captured["json"]["model"] == "m"
     assert captured["json"]["response_format"] == {"type": "json_object"}
+    assert captured["json"]["thinking"] == {"type": "disabled"}
     assert captured["headers"]["Authorization"] == "Bearer k"
     assert captured["timeout"] == 20.0
 
