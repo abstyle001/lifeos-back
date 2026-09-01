@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
-from .models import DailyRecord, SocialInteraction, User
+from .models import DailyRecord, Goal, SocialInteraction, Task, User
 from .security import hash_password
 from .services.achievements import check_and_unlock
 from .services.experience import level_for_xp, record_xp
@@ -59,6 +59,16 @@ def seed(db: Session) -> None:
             quality=rng.randint(4, 9),
         )
         db.add(social)
+
+    # 演示任务（最近 5 天）
+    for i in range(5, 0, -1):
+        day = today - timedelta(days=i)
+        db.add(Task(user_id=user.id, date=day, title="阅读 30 分钟", done=True))
+        db.add(Task(user_id=user.id, date=day, title="锻炼 20 分钟", done=i <= 3))
+
+    # 演示目标
+    db.add(Goal(user_id=user.id, title="连续打卡 30 天", done=False))
+    db.add(Goal(user_id=user.id, title="读完 5 本书", done=False))
 
     user.experience = total_xp
     user.level = level_for_xp(total_xp)

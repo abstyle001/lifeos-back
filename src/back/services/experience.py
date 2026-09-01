@@ -6,6 +6,13 @@ from datetime import date, timedelta
 from ..models import DailyRecord
 
 
+def _task_xp(completed: int, total: int) -> int:
+    """按任务完成率计分（0..20），修复「完成数」而非「完成率」计分的问题。"""
+    if total <= 0:
+        return 0
+    return round(20 * (completed / total))
+
+
 def record_xp(record: DailyRecord) -> int:
     """单条记录贡献的经验值（初始公式，后续可调）。"""
     sleep_bonus = 10 if 7 <= record.sleep <= 9 else 5
@@ -15,7 +22,7 @@ def record_xp(record: DailyRecord) -> int:
         + record.reading_count * 5
         + record.exercise * 6
         + sleep_bonus
-        + record.tasks_completed * 5
+        + _task_xp(record.tasks_completed, record.tasks_total)
         + record.mood * 2
     )
     return round(xp)

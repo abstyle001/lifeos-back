@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     ]
     seed_demo: bool = True
     auto_create_tables: bool = True
+    # Vercel Blob（头像存储）
+    blob_read_write_token: str = ""
     # AI 教练（OpenAI 兼容接口）
     ai_base_url: str = ""
     ai_api_key: str = ""

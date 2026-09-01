@@ -25,6 +25,7 @@ from ..schemas import (
 from ..security import get_current_user
 from ..services.ai import (
     build_chat_context,
+    build_forecast,
     build_monthly_stats,
     build_weekly_stats,
     chat as ai_chat,
@@ -103,6 +104,7 @@ def weekly_report(
     today = date.today()
     week_start, week_end = today - timedelta(days=6), today
     stats = build_weekly_stats(records, today, current.level, current.experience, social)
+    prediction = build_forecast(stats, "下周")
 
     if not refresh:
         cached = get_cached_report(db, current.id, week_end)
@@ -118,6 +120,7 @@ def weekly_report(
                 concerns=content.concerns,
                 suggestions=content.suggestions,
                 next_goal=content.next_goal,
+                prediction=prediction,
                 source=source,
             )
 
@@ -136,6 +139,7 @@ def weekly_report(
         concerns=content.concerns,
         suggestions=content.suggestions,
         next_goal=content.next_goal,
+        prediction=prediction,
         source=source,
     )
 
@@ -169,6 +173,7 @@ def monthly_report(
     stats = build_monthly_stats(
         records, today, current.level, current.experience, social
     )
+    prediction = build_forecast(stats, "下月")
     content, source = generate_monthly_report(stats, month_start, month_end)
     return MonthlyReportOut(
         generated_at=datetime.now(),
@@ -180,6 +185,7 @@ def monthly_report(
         concerns=content.concerns,
         suggestions=content.suggestions,
         next_goal=content.next_goal,
+        prediction=prediction,
         source=source,
     )
 

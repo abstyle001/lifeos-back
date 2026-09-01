@@ -22,6 +22,20 @@ class UserOut(BaseModel):
     experience: int
 
 
+class UserUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    username: str | None = Field(default=None, min_length=3, max_length=50)
+    old_password: str | None = Field(default=None, max_length=128)
+    new_password: str | None = Field(default=None, min_length=6, max_length=128)
+
+    @model_validator(mode="after")
+    def validate_password_change(self) -> Self:
+        if self.new_password is not None and not self.old_password:
+            raise ValueError("修改密码需提供当前密码")
+        return self
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -90,6 +104,45 @@ class SocialOut(BaseModel):
     quality: int
 
 
+# --- Tasks / Goals ---
+class TaskIn(BaseModel):
+    date: date
+    title: str = Field(min_length=1, max_length=200)
+    done: bool = False
+
+
+class TaskOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    date: date
+    title: str
+    done: bool
+
+
+class GoalIn(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    done: bool = False
+
+
+class GoalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    done: bool
+
+
+class TaskUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    done: bool | None = None
+
+
+class GoalUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    done: bool | None = None
+
+
 # --- Attributes / dashboard ---
 class Attributes(BaseModel):
     INT: int
@@ -109,6 +162,15 @@ class TrendPoint(BaseModel):
     study_time: float
     sleep: float
     exercise: float
+    reading_count: int
+    skill_time: float
+    mood: int
+    focus: int
+    diet: int
+    stress: int
+    energy: int
+    tasks_completed: int
+    tasks_total: int
 
 
 class DashboardOut(BaseModel):
@@ -132,11 +194,19 @@ class AchievementOut(BaseModel):
     title: str
     description: str
     unlocked_at: datetime | None = None
+    requirement: str = ""
+    progress: float | None = None
 
 
 class AchievementsOut(BaseModel):
     unlocked: list[AchievementOut]
     locked: list[AchievementOut]
+
+
+class RecordSaveOut(RecordOut):
+    """保存记录后的响应：附带本次新解锁的成就，用于前端即时反馈。"""
+
+    new_achievements: list[AchievementOut] = []
 
 
 # --- AI ---
@@ -186,6 +256,7 @@ class WeeklyReportOut(BaseModel):
     concerns: list[ReportItem]
     suggestions: list[ReportItem]
     next_goal: str
+    prediction: str = ""
     source: Literal["ai", "fallback"]
 
 
@@ -216,6 +287,7 @@ class MonthlyReportOut(BaseModel):
     concerns: list[ReportItem]
     suggestions: list[ReportItem]
     next_goal: str
+    prediction: str = ""
     source: Literal["ai", "fallback"]
 
 
@@ -232,3 +304,21 @@ class ChatMessageOut(BaseModel):
 
 class ChatOut(BaseModel):
     reply: str
+
+
+# --- 数据导出 / 导入 ---
+class ExportOut(BaseModel):
+    exported_at: datetime
+    user: UserOut
+    records: list[RecordOut]
+    social: list[SocialOut]
+    achievements: list[AchievementOut]
+    goals: list[GoalOut]
+    tasks: list[TaskOut]
+
+
+class ImportIn(BaseModel):
+    records: list[RecordIn] = []
+    social: list[SocialIn] = []
+    goals: list[GoalIn] = []
+    tasks: list[TaskIn] = []

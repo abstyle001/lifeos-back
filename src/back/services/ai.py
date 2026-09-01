@@ -257,6 +257,26 @@ def build_chat_context(stats: WeeklyStats) -> str:
     return "\n".join(lines)
 
 
+def build_forecast(stats: WeeklyStats, next_label: str = "下周") -> str:
+    """基于环比 delta 做简单线性外推，给出一条确定性趋势预测（不依赖 LLM）。"""
+    upward = [m for m in stats.metrics if m.key in POSITIVE and m.previous and m.delta > 0]
+    downward = [m for m in stats.metrics if m.key in POSITIVE and m.previous and m.delta < 0]
+    stress = next((m for m in stats.metrics if m.key == "stress" and m.previous), None)
+    parts: list[str] = []
+    if upward:
+        m = max(upward, key=lambda x: x.delta)
+        nxt = round(m.current + m.delta, 2)
+        parts.append(f"{next_label}{m.label}若保持当前节奏，预计可达约 {nxt}{m.unit}")
+    if downward:
+        m = min(downward, key=lambda x: x.delta)
+        parts.append(f"{m.label}有回落趋势，建议留意")
+    if stress and stress.delta > 0:
+        parts.append("压力水平上升，建议增加休息与放松")
+    if not parts:
+        return "数据不足以预测趋势，坚持记录一段时间后即可获得预测。"
+    return "；".join(parts) + "。"
+
+
 def _parse_json_object(text: str) -> dict | None:
     text = (text or "").strip()
     if not text:

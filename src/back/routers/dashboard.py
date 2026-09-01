@@ -49,7 +49,21 @@ def dashboard(
     attributes = compute_attributes(records, social)
     streak = calc_streak(records, today)
     trend = [
-        TrendPoint(date=r.date, study_time=r.study_time, sleep=r.sleep, exercise=r.exercise)
+        TrendPoint(
+            date=r.date,
+            study_time=r.study_time,
+            sleep=r.sleep,
+            exercise=r.exercise,
+            reading_count=r.reading_count,
+            skill_time=r.skill_time,
+            mood=r.mood,
+            focus=r.focus,
+            diet=r.diet,
+            stress=r.stress,
+            energy=r.energy,
+            tasks_completed=r.tasks_completed,
+            tasks_total=r.tasks_total,
+        )
         for r in records[-30:]
     ]
     recent = list(reversed(records[-7:]))

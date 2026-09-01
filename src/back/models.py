@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from sqlalchemy import (
+    Boolean,
     Date,
     DateTime,
     Float,
@@ -42,6 +43,12 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan"
     )
     chat_messages: Mapped[list[ChatMessage]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    tasks: Mapped[list[Task]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    goals: Mapped[list[Goal]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -135,3 +142,32 @@ class ChatMessage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="chat_messages")
+
+
+class Task(Base):
+    """每日任务实体（to-do 清单，独立于每日记录的计数汇总）。"""
+
+    __tablename__ = "tasks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    date: Mapped[date] = mapped_column(Date, index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    done: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="tasks")
+
+
+class Goal(Base):
+    """长期目标。"""
+
+    __tablename__ = "goals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    done: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="goals")

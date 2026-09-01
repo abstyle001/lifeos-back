@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import DailyRecord, User
-from ..schemas import RecordIn, RecordOut
+from ..schemas import AchievementOut, RecordIn, RecordOut, RecordSaveOut
 from ..security import get_current_user
 from ..services.achievements import check_and_unlock
 from ..services.experience import level_for_xp, record_xp
@@ -26,12 +26,12 @@ def _recalc_xp(db: Session, user: User) -> None:
     user.level = level_for_xp(user.experience)
 
 
-@router.post("", response_model=RecordOut)
+@router.post("", response_model=RecordSaveOut)
 def upsert_record(
     payload: RecordIn,
     db: Annotated[Session, Depends(get_db)],
     current: Annotated[User, Depends(get_current_user)],
-) -> DailyRecord:
+) -> RecordSaveOut:
     record = db.scalar(
         select(DailyRecord).where(
             DailyRecord.user_id == current.id, DailyRecord.date == payload.date
@@ -47,9 +47,12 @@ def upsert_record(
     _recalc_xp(db, current)
     db.commit()
     db.refresh(record)
-    check_and_unlock(db, current)
+    new_achievements = check_and_unlock(db, current)
     db.commit()
-    return record
+    return RecordSaveOut(
+        **RecordOut.model_validate(record).model_dump(),
+        new_achievements=[AchievementOut.model_validate(a) for a in new_achievements],
+    )
 
 
 @router.get("", response_model=list[RecordOut])
