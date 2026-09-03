@@ -54,7 +54,7 @@ def dashboard(
             study_time=r.study_time,
             sleep=r.sleep,
             exercise=r.exercise,
-            reading_count=r.reading_count,
+            reading_time=r.reading_time,
             skill_time=r.skill_time,
             mood=r.mood,
             focus=r.focus,
@@ -84,7 +84,7 @@ def dashboard(
         total_days=len(records),
         total_study_hours=round(sum(r.study_time for r in records), 1),
         total_exercise_hours=round(sum(r.exercise for r in records), 1),
-        books_read=sum(r.reading_count for r in records),
+        total_reading_hours=round(sum(r.reading_time for r in records), 1),
         recent_records=[RecordOut.model_validate(r) for r in recent],
         trend=trend,
     )

@@ -40,7 +40,7 @@ def seed(db: Session) -> None:
             exercise=round(rng.uniform(0.0, 1.2) + progress * 0.6, 1),
             mood=rng.randint(4, 9),
             focus=rng.randint(4, 9),
-            reading_count=rng.randint(0, 1),
+            reading_time=round(rng.uniform(0.0, 1.0) + progress * 1.5, 1),
             skill_time=round(rng.uniform(0.0, 1.5) + progress * 1.5, 1),
             diet=rng.randint(4, 9),
             stress=rng.randint(2, 7),
@@ -63,8 +63,8 @@ def seed(db: Session) -> None:
     # 演示任务（最近 5 天）
     for i in range(5, 0, -1):
         day = today - timedelta(days=i)
-        db.add(Task(user_id=user.id, date=day, title="阅读 30 分钟", done=True))
-        db.add(Task(user_id=user.id, date=day, title="锻炼 20 分钟", done=i <= 3))
+        db.add(Task(user_id=user.id, date=day, title="阅读 30 分钟", done=True, importance="high"))
+        db.add(Task(user_id=user.id, date=day, title="锻炼 20 分钟", done=i <= 3, importance="medium"))
 
     # 演示目标
     db.add(Goal(user_id=user.id, title="连续打卡 30 天", done=False))

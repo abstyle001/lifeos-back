@@ -12,7 +12,7 @@ def _rec(**kw):
         exercise=0.5,
         mood=7,
         focus=7,
-        reading_count=1,
+        reading_time=1,
         skill_time=1,
         diet=7,
         stress=4,
@@ -29,8 +29,8 @@ def test_empty_returns_baseline():
 
 
 def test_more_study_raises_int():
-    low = [_rec(study_time=0.5, skill_time=0, reading_count=0) for _ in range(5)]
-    high = [_rec(study_time=4, skill_time=3, reading_count=3) for _ in range(5)]
+    low = [_rec(study_time=0.5, skill_time=0, reading_time=0) for _ in range(5)]
+    high = [_rec(study_time=4, skill_time=3, reading_time=3) for _ in range(5)]
     assert compute_attributes(high)["INT"] > compute_attributes(low)["INT"]
 
 

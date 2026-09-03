@@ -59,6 +59,8 @@ def update_task(
         task.title = payload.title
     if payload.done is not None:
         task.done = payload.done
+    if payload.importance is not None:
+        task.importance = payload.importance
     db.commit()
     db.refresh(task)
     return task

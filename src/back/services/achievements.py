@@ -99,7 +99,7 @@ DEFINITIONS: list[AchievementDef] = [
     ),
     AchievementDef("streak_7", "坚持不懈", "连续打卡 7 天", "连续打卡 7 天", 7, _streak),
     AchievementDef("streak_30", "铁人", "连续打卡 30 天", "连续打卡 30 天", 30, _streak),
-    AchievementDef("bookworm", "读书破万卷", "累计阅读 10 本书", "累计阅读 10 本", 10, _sum("reading_count")),
+    AchievementDef("bookworm", "读书破万卷", "累计阅读 20 小时", "累计阅读 20 小时", 20, _sum("reading_time")),
     AchievementDef("athlete", "运动达人", "累计运动 50 小时", "累计运动 50 小时", 50, _sum("exercise")),
     AchievementDef("scholar", "学霸", "累计学习 100 小时", "累计学习 100 小时", 100, _sum("study_time")),
     AchievementDef("level_5", "初出茅庐", "达到等级 5", "达到等级 5", 5, _level),
@@ -107,7 +107,7 @@ DEFINITIONS: list[AchievementDef] = [
     AchievementDef("xp_1000", "经验大师", "累计获得 1000 经验", "累计 1000 经验", 1000, _xp),
     AchievementDef("task_master", "效率之王", "日均任务完成率 80%", "日均任务完成率 80%", 0.8, _task_completion_rate),
     AchievementDef("perfect_week", "完美一周", "连续 7 天完成全部任务", "连续 7 天任务全勤", 7, _streak_perfect),
-    AchievementDef("social_butterfly", "社交达人", "累计 30 次社交互动", "累计 30 次互动", 30, _social_total),
+    AchievementDef("social_butterfly", "社交达人", "累计社交活跃度达到 30", "累计社交活跃度 30", 30, _social_total),
     AchievementDef("attr_70", "属性觉醒", "任一属性达到 70", "任一属性达到 70", 70, _attr_max),
     AchievementDef("balanced", "全面发展", "四项属性均达到 50", "四项属性 ≥ 50", 50, _attr_balanced),
 ]

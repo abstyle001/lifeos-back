@@ -26,7 +26,7 @@ def compute_attributes(
 
     study = [r.study_time for r in recent]
     skill = [r.skill_time for r in recent]
-    reading = [r.reading_count for r in recent]
+    reading = [r.reading_time for r in recent]
     sleep = [min(r.sleep, 10) for r in recent]
     exercise = [r.exercise for r in recent]
     diet = [r.diet for r in recent]
@@ -43,9 +43,8 @@ def compute_attributes(
         recent_social = social_records[-14:] if len(social_records) > 14 else social_records
         if recent_social:
             interactions = [s.interactions for s in recent_social]
-            social_time = [s.social_time for s in recent_social]
             quality = [s.quality for s in recent_social]
-            CHA = _clamp(30 + _avg(interactions) * 6 + _avg(social_time) * 3 + _avg(quality) * 4)
+            CHA = _clamp(30 + _avg(interactions) * 8 + _avg(quality) * 4)
         else:
             CHA = _clamp(30 + _avg(mood) * 8 + _avg(energy) * 6 - _avg(stress) * 2)
     else:

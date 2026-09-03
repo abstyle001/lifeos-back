@@ -50,7 +50,7 @@ class RecordIn(BaseModel):
     exercise: float = Field(ge=0, le=24)
     mood: int = Field(ge=0, le=10)
     focus: int = Field(ge=0, le=10)
-    reading_count: int = Field(ge=0)
+    reading_time: float = Field(ge=0, le=24)
     skill_time: float = Field(ge=0, le=24)
     diet: int = Field(ge=0, le=10)
     stress: int = Field(ge=0, le=10)
@@ -76,7 +76,7 @@ class RecordOut(BaseModel):
     exercise: float
     mood: int
     focus: int
-    reading_count: int
+    reading_time: float
     skill_time: float
     diet: int
     stress: int
@@ -109,6 +109,7 @@ class TaskIn(BaseModel):
     date: date
     title: str = Field(min_length=1, max_length=200)
     done: bool = False
+    importance: Literal["high", "medium", "low"] = "medium"
 
 
 class TaskOut(BaseModel):
@@ -118,6 +119,7 @@ class TaskOut(BaseModel):
     date: date
     title: str
     done: bool
+    importance: Literal["high", "medium", "low"]
 
 
 class GoalIn(BaseModel):
@@ -136,6 +138,7 @@ class GoalOut(BaseModel):
 class TaskUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     done: bool | None = None
+    importance: Literal["high", "medium", "low"] | None = None
 
 
 class GoalUpdate(BaseModel):
@@ -162,7 +165,7 @@ class TrendPoint(BaseModel):
     study_time: float
     sleep: float
     exercise: float
-    reading_count: int
+    reading_time: float
     skill_time: float
     mood: int
     focus: int
@@ -181,7 +184,7 @@ class DashboardOut(BaseModel):
     total_days: int
     total_study_hours: float
     total_exercise_hours: float
-    books_read: int
+    total_reading_hours: float
     recent_records: list[RecordOut]
     trend: list[TrendPoint]
 

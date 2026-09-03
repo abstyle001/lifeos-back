@@ -19,7 +19,7 @@ def record_xp(record: DailyRecord) -> int:
     xp = (
         record.study_time * 10
         + record.skill_time * 8
-        + record.reading_count * 5
+        + record.reading_time * 5
         + record.exercise * 6
         + sleep_bonus
         + _task_xp(record.tasks_completed, record.tasks_total)

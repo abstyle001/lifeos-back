@@ -18,7 +18,7 @@ def _record_payload(day, **kw):
         exercise=1,
         mood=8,
         focus=8,
-        reading_count=1,
+        reading_time=1,
         skill_time=1.5,
         diet=7,
         stress=3,

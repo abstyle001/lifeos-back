@@ -65,7 +65,7 @@ class DailyRecord(Base):
     exercise: Mapped[float] = mapped_column(Float, default=0)  # 小时
     mood: Mapped[int] = mapped_column(Integer, default=0)  # 1-10
     focus: Mapped[int] = mapped_column(Integer, default=0)  # 1-10
-    reading_count: Mapped[int] = mapped_column(Integer, default=0)  # 本
+    reading_time: Mapped[float] = mapped_column(Float, default=0)  # 阅读时长（小时）
     skill_time: Mapped[float] = mapped_column(Float, default=0)  # 小时
     diet: Mapped[int] = mapped_column(Integer, default=0)  # 1-10
     stress: Mapped[int] = mapped_column(Integer, default=0)  # 1-10
@@ -122,8 +122,8 @@ class SocialInteraction(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     date: Mapped[date] = mapped_column(Date, index=True)
-    interactions: Mapped[int] = mapped_column(Integer, default=0)  # 有意义互动次数
-    social_time: Mapped[float] = mapped_column(Float, default=0)  # 社交时长（小时）
+    interactions: Mapped[int] = mapped_column(Integer, default=0)  # 互动频率（0=无 … 3=很多，映射 0/2/4/6）
+    social_time: Mapped[float] = mapped_column(Float, default=0)  # 已弃用，保留兼容，恒 0
     quality: Mapped[int] = mapped_column(Integer, default=0)  # 社交质量 0-10
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -154,6 +154,7 @@ class Task(Base):
     date: Mapped[date] = mapped_column(Date, index=True)
     title: Mapped[str] = mapped_column(String(200))
     done: Mapped[bool] = mapped_column(Boolean, default=False)
+    importance: Mapped[str] = mapped_column(String(10), default="medium")  # high / medium / low
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="tasks")

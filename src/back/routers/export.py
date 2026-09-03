@@ -126,7 +126,7 @@ def import_data(
         key = (t.date, t.title)
         if key in existing_task_keys:
             continue
-        db.add(Task(user_id=current.id, date=t.date, title=t.title, done=t.done))
+        db.add(Task(user_id=current.id, date=t.date, title=t.title, done=t.done, importance=t.importance))
         existing_task_keys.add(key)
         imported["tasks"] += 1
 
