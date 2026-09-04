@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 
 # --- Auth ---
@@ -152,6 +152,40 @@ class Attributes(BaseModel):
     VIT: int
     FOCUS: int
     CHA: int
+
+
+# --- Public profiles ---
+class ProfileSettingsOut(BaseModel):
+    is_public: bool
+
+
+class ProfileSettingsUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    is_public: StrictBool
+
+
+class ProfileSearchResult(BaseModel):
+    username: str
+    avatar: str | None
+    level: int
+    experience: int
+
+
+class PublicAchievementOut(BaseModel):
+    code: str
+    title: str
+    description: str
+    unlocked_at: datetime
+
+
+class PublicProfileOut(BaseModel):
+    username: str
+    avatar: str | None
+    level: int
+    experience: int
+    attributes: Attributes
+    achievements: list[PublicAchievementOut]
 
 
 class TodayStatus(BaseModel):
