@@ -384,3 +384,68 @@ class ImportIn(BaseModel):
     social: list[SocialIn] = []
     goals: list[GoalIn] = []
     tasks: list[TaskIn] = []
+
+
+# --- Direct Chat（用户私聊） ---
+class ConversationCreate(BaseModel):
+    """发起会话入参：peer 是对方 username。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    peer: str = Field(min_length=1, max_length=50)
+
+
+class ChatPeerOut(BaseModel):
+    """会话中对方的最小投影（沿用公开档案白名单口径，不暴露敏感字段）。"""
+
+    username: str
+    avatar: str | None
+    level: int
+
+
+class DirectMessageOut(BaseModel):
+    """单条私聊消息。sender_username 由服务层拼接，避免前端二次请求。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    conversation_id: int
+    sender_id: int
+    sender_username: str
+    content: str
+    created_at: datetime
+    client_message_id: str | None = None
+
+
+class ConversationOut(BaseModel):
+    """会话列表项 / 发起会话返回值。"""
+
+    id: int
+    peer: ChatPeerOut
+    last_message: DirectMessageOut | None = None
+    last_message_at: datetime | None = None
+    unread_count: int = 0
+    created_at: datetime
+
+
+class SendMessageIn(BaseModel):
+    """发送消息入参。client_message_id 用于前端幂等重试（UUID）。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    content: str = Field(min_length=1, max_length=2000)
+    client_message_id: str | None = Field(default=None, max_length=64)
+
+
+class MarkReadIn(BaseModel):
+    """标记已读入参。message_id 为空表示读到会话最新消息。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    message_id: int | None = None
+
+
+class UnreadCountOut(BaseModel):
+    """侧边栏未读徽标初始化用的快捷计数。"""
+
+    total: int

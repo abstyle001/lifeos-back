@@ -4,6 +4,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -221,3 +222,68 @@ class Goal(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="goals")
+
+
+class Conversation(Base):
+    """用户之间的 1v1 私聊会话。
+
+    规约：始终 user_a_id < user_b_id，保证同一对用户全局只有一条会话记录。
+    双方独立维护 hidden_at_*（软删除，仅对自己隐藏）与 last_read_message_id_*
+    （最后已读消息 id，用于未读计数与将来的已读回执）。
+    """
+
+    __tablename__ = "conversations"
+    __table_args__ = (
+        UniqueConstraint("user_a_id", "user_b_id", name="uq_conversation_pair"),
+        CheckConstraint("user_a_id < user_b_id", name="ck_conversation_ordered"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_a_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    user_b_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # 双方独立的软删除时间戳（NULL = 未隐藏）；对方发新消息时接收方的 hidden_at 会被清空
+    hidden_at_a: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    hidden_at_b: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    # 双方独立的最后已读消息 id（NULL = 一条都没读过）
+    last_read_message_id_a: Mapped[int | None] = mapped_column(Integer, default=None)
+    last_read_message_id_b: Mapped[int | None] = mapped_column(Integer, default=None)
+
+    user_a: Mapped[User] = relationship(foreign_keys=[user_a_id])
+    user_b: Mapped[User] = relationship(foreign_keys=[user_b_id])
+    messages: Mapped[list[DirectMessage]] = relationship(
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class DirectMessage(Base):
+    """私聊消息。
+
+    client_message_id 是前端生成的 UUID，配合 conversation_id 支持幂等重试；
+    MVP 阶段先加普通索引，服务端在插入前查询去重（生产 PostgreSQL 建议
+    后续升级为部分唯一索引）。
+    """
+
+    __tablename__ = "direct_messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), index=True
+    )
+    sender_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    content: Mapped[str] = mapped_column(Text)
+    client_message_id: Mapped[str | None] = mapped_column(String(64), default=None, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), index=True
+    )
+
+    conversation: Mapped[Conversation] = relationship(back_populates="messages")
+    sender: Mapped[User] = relationship(foreign_keys=[sender_id])

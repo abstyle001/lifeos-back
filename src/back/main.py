@@ -11,6 +11,7 @@ from .routers import (
     achievements,
     ai,
     auth,
+    chat,
     dashboard,
     export,
     follows,
@@ -49,6 +50,7 @@ app.include_router(records.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(achievements.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
 app.include_router(social.router, prefix="/api")
 app.include_router(profiles.router, prefix="/api")
 app.include_router(follows.router, prefix="/api")
