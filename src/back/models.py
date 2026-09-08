@@ -54,6 +54,16 @@ class User(Base):
     profile_settings: Mapped[ProfileSettings | None] = relationship(
         back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
+    following: Mapped[list[Follow]] = relationship(
+        foreign_keys="Follow.follower_id",
+        back_populates="follower",
+        cascade="all, delete-orphan",
+    )
+    followers: Mapped[list[Follow]] = relationship(
+        foreign_keys="Follow.followee_id",
+        back_populates="followee",
+        cascade="all, delete-orphan",
+    )
 
 
 class ProfileSettings(Base):
@@ -71,6 +81,25 @@ class ProfileSettings(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="profile_settings")
+
+
+class Follow(Base):
+    """单向关注：follower 关注 followee，无需对方同意（仅公开用户可被关注）。"""
+
+    __tablename__ = "follows"
+    __table_args__ = (UniqueConstraint("follower_id", "followee_id", name="uq_follow_pair"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    follower_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    followee_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    follower: Mapped[User] = relationship(
+        foreign_keys=[follower_id], back_populates="following"
+    )
+    followee: Mapped[User] = relationship(
+        foreign_keys=[followee_id], back_populates="followers"
+    )
 
 
 class DailyRecord(Base):

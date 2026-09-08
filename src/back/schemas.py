@@ -186,6 +186,31 @@ class PublicProfileOut(BaseModel):
     experience: int
     attributes: Attributes
     achievements: list[PublicAchievementOut]
+    is_self: bool = False
+    is_following: bool = False
+    is_followed_by: bool = False
+    following_count: int = 0
+    followers_count: int = 0
+
+
+# --- Follows ---
+class FollowUserOut(ProfileSearchResult):
+    """关注/粉丝列表项，复用公开搜索结果的名片形状。"""
+
+
+class FollowActionOut(BaseModel):
+    username: str
+    is_following: bool
+    followers_count: int
+
+
+class FollowRelationOut(BaseModel):
+    username: str
+    is_self: bool
+    is_following: bool
+    is_followed_by: bool
+    following_count: int
+    followers_count: int
 
 
 class TodayStatus(BaseModel):

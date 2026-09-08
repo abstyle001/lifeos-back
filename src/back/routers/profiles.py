@@ -31,10 +31,10 @@ def search_profiles(
     # not incorrectly consume the username length budget.
     q: Annotated[str, Query(min_length=1)],
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(get_current_user)],
+    current: Annotated[User, Depends(get_current_user)],
 ) -> list[ProfileSearchResult]:
     try:
-        users = search_public_profiles(db, q)
+        users = search_public_profiles(db, q, exclude_user_id=current.id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     return [

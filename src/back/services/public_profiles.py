@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from ..models import Achievement, DailyRecord, ProfileSettings, SocialInteraction, User
 from ..schemas import Attributes, ProfileSettingsOut, PublicAchievementOut, PublicProfileOut
 from ..services.attributes import compute_attributes
+from ..services.follows import follow_counts, is_following
 
 
 def _escape_like(value: str) -> str:
@@ -29,7 +30,9 @@ def set_profile_visibility(db: Session, user_id: int, is_public: bool) -> Profil
     return ProfileSettingsOut(is_public=bool(settings.is_public))
 
 
-def search_public_profiles(db: Session, query: str) -> list[User]:
+def search_public_profiles(
+    db: Session, query: str, exclude_user_id: int | None = None
+) -> list[User]:
     term = query.strip()
     if len(term) < 2:
         raise ValueError("请输入至少 2 个字符的用户名")
@@ -44,13 +47,16 @@ def search_public_profiles(db: Session, query: str) -> list[User]:
         (username_lower.like(f"{escaped}%", escape="\\"), 1),
         else_=2,
     )
+    conditions = [
+        ProfileSettings.is_public.is_(True),
+        username_lower.like(f"%{escaped}%", escape="\\"),
+    ]
+    if exclude_user_id is not None:
+        conditions.append(User.id != exclude_user_id)
     statement = (
         select(User)
         .join(ProfileSettings, ProfileSettings.user_id == User.id)
-        .where(
-            ProfileSettings.is_public.is_(True),
-            username_lower.like(f"%{escaped}%", escape="\\"),
-        )
+        .where(*conditions)
         .order_by(priority, username_lower)
         .limit(20)
     )
@@ -68,7 +74,8 @@ def build_public_profile(
             select(ProfileSettings.is_public).where(ProfileSettings.user_id == target.id)
         )
     )
-    if target.id != viewer.id and not is_public:
+    is_self = target.id == viewer.id
+    if not is_self and not is_public:
         return None
 
     records = list(
@@ -93,6 +100,8 @@ def build_public_profile(
         )
     )
 
+    following_count, followers_count = follow_counts(db, target.id)
+
     return PublicProfileOut(
         username=target.username,
         avatar=target.avatar,
@@ -108,4 +117,9 @@ def build_public_profile(
             )
             for achievement in achievements
         ],
+        is_self=is_self,
+        is_following=not is_self and is_following(db, viewer.id, target.id),
+        is_followed_by=not is_self and is_following(db, target.id, viewer.id),
+        following_count=following_count,
+        followers_count=followers_count,
     )

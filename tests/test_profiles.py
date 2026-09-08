@@ -67,6 +67,17 @@ def test_profile_search_is_case_insensitive_public_only_and_ranked(client):
     assert private["Authorization"]
 
 
+def test_profile_search_excludes_the_caller_them_self(client):
+    owner = _auth_headers(client, "selfsearch")
+    _set_public(client, owner)
+    other = _auth_headers(client, "bystander")
+
+    own_results = client.get("/api/profiles/search?q=self", headers=owner).json()
+    assert [item["username"] for item in own_results] == []
+    other_results = client.get("/api/profiles/search?q=self", headers=other).json()
+    assert [item["username"] for item in other_results] == ["selfsearch"]
+
+
 def test_profile_search_is_capped_at_twenty_results(client):
     viewer = _auth_headers(client, "capviewer")
     for index in range(21):
@@ -96,7 +107,22 @@ def test_public_profile_is_allowlisted_and_uses_backend_attributes(client):
     response = client.get("/api/profiles/publicowner", headers=viewer)
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"username", "avatar", "level", "experience", "attributes", "achievements"}
+    assert set(body) == {
+        "username",
+        "avatar",
+        "level",
+        "experience",
+        "attributes",
+        "achievements",
+        "is_self",
+        "is_following",
+        "is_followed_by",
+        "following_count",
+        "followers_count",
+    }
+    assert body["is_self"] is False
+    assert body["is_following"] is False
+    assert body["is_followed_by"] is False
     assert set(body["attributes"]) == {"INT", "VIT", "FOCUS", "CHA"}
     assert any(achievement["code"] == "first_record" for achievement in body["achievements"])
     assert all(set(achievement) == {"code", "title", "description", "unlocked_at"} for achievement in body["achievements"])
@@ -121,6 +147,7 @@ def test_private_profile_is_hidden_from_others_but_visible_to_owner(client):
     own = client.get("/api/profiles/privateowner", headers=owner)
     assert own.status_code == 200
     assert own.json()["username"] == "privateowner"
+    assert own.json()["is_self"] is True
 
     _set_public(client, owner, False)
     assert client.get("/api/profiles/privateowner", headers=viewer).status_code == 404
