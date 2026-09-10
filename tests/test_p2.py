@@ -109,6 +109,54 @@ def test_export_roundtrip(client):
     assert imported.json()["goals"] == 1
 
 
+def test_import_dedupes_existing_data(client):
+    """重复导入同一份数据：records/social 按日期覆盖更新，goals 按标题、tasks 按日期+标题跳过，不产生重复行。"""
+    h = _auth_headers(client, username="dedupe")
+    today = date.today()
+
+    # 预置：1 条记录、1 条社交、1 个目标、1 条任务
+    client.post("/api/records", headers=h, json=_record_payload(today))
+    client.post(
+        "/api/social",
+        headers=h,
+        json={"date": today.isoformat(), "interactions": 3, "social_time": 2.0, "quality": 7},
+    )
+    client.post("/api/goals", headers=h, json={"title": "早起", "done": False})
+    client.post(
+        "/api/tasks", headers=h, json={"date": today.isoformat(), "title": "阅读", "done": False}
+    )
+
+    # 同一份数据再次导入：记录/社交带新值（应覆盖），目标/任务原样（应跳过）
+    payload = {
+        "records": [_record_payload(today, sleep=8.0)],
+        "social": [
+            {"date": today.isoformat(), "interactions": 5, "social_time": 1.0, "quality": 9}
+        ],
+        "goals": [{"title": "早起", "done": True}],
+        "tasks": [{"date": today.isoformat(), "title": "阅读", "done": True}],
+    }
+    r = client.post("/api/import", headers=h, json=payload)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["records"] == 1
+    assert body["social"] == 1
+    assert body["goals"] == 0
+    assert body["tasks"] == 0
+
+    # 无重复行产生，且覆盖生效
+    records = client.get("/api/records", headers=h).json()
+    social = client.get("/api/social", headers=h).json()
+    goals = client.get("/api/goals", headers=h).json()
+    tasks = client.get("/api/tasks", headers=h).json()
+    assert len(records) == 1 and len(social) == 1
+    assert len(goals) == 1 and len(tasks) == 1
+    assert records[0]["sleep"] == 8.0
+    assert social[0]["interactions"] == 5
+    # 重复目标/任务被跳过，保持原值不被覆盖
+    assert goals[0]["done"] is False
+    assert tasks[0]["done"] is False
+
+
 def test_username_update(client):
     h = _auth_headers(client, username="renameme")
     r = client.patch("/api/auth/me", headers=h, json={"username": "newname"})
