@@ -154,6 +154,38 @@ class Attributes(BaseModel):
     CHA: int
 
 
+# --- 属性可解释 ---
+class AttributeFactor(BaseModel):
+    key: str
+    label: str
+    unit: str | None = None
+    avg: float | None = None  # 数值型因子的近 14 天均值；bonus 型为 None
+    weight: float | None = None  # 数值型因子的权重；bonus 型为 None
+    contribution: float  # 对属性的贡献（已带符号）
+    kind: str = "linear"  # "linear"（均值×权重）| "bonus"（条件触发）
+    detail: str | None = None
+    cap: float | None = None
+
+
+class AttributeExplanation(BaseModel):
+    key: str
+    label: str
+    zh: str
+    value: int  # 最终属性值（0-100，与仪表盘一致）
+    base: int  # 基线 30
+    factors: list[AttributeFactor]
+    source: str  # "formula" | "social"（CHA 用真实社交数据）| "proxy"（CHA 用情绪代理）
+    note: str | None = None
+
+
+class AttributesExplainOut(BaseModel):
+    attributes: list[AttributeExplanation]
+    window_days: int  # 计算窗口（近 14 天）
+    record_count: int  # 窗口内实际记录数
+    has_social: bool  # 窗口内是否有社交记录
+
+
+
 # --- Public profiles ---
 class ProfileSettingsOut(BaseModel):
     is_public: bool

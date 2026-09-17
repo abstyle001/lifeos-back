@@ -123,3 +123,41 @@ def test_record_validates_task_progress_and_note_length(client):
         json=_record_payload(today, note="x" * 501),
     )
     assert invalid_note.status_code == 422
+
+
+def test_attributes_explain_requires_auth(client):
+    assert client.get("/api/dashboard/attributes/explain").status_code == 401
+
+
+def test_attributes_explain_empty_user(client):
+    h = _auth_headers(client)
+    exp = client.get("/api/dashboard/attributes/explain", headers=h).json()
+    assert exp["record_count"] == 0
+    assert exp["window_days"] == 14
+    assert [a["key"] for a in exp["attributes"]] == ["INT", "VIT", "FOCUS", "CHA"]
+    assert all(a["value"] == 30 and a["factors"] == [] for a in exp["attributes"])
+
+
+def test_attributes_explain_matches_dashboard(client):
+    h = _auth_headers(client)
+    today = date.today()
+    client.post("/api/records", headers=h, json=_record_payload(today))
+    client.post(
+        "/api/social",
+        headers=h,
+        json={"date": today.isoformat(), "interactions": 4, "social_time": 0, "quality": 8},
+    )
+
+    dash = client.get("/api/dashboard", headers=h).json()["attributes"]
+    exp = client.get("/api/dashboard/attributes/explain", headers=h).json()
+
+    assert exp["record_count"] == 1
+    assert exp["has_social"] is True
+    for attr in exp["attributes"]:
+        assert attr["value"] == dash[attr["key"]]
+        assert attr["base"] == 30
+        assert len(attr["factors"]) >= 2
+        assert all(f["contribution"] is not None for f in attr["factors"])
+    cha = next(a for a in exp["attributes"] if a["key"] == "CHA")
+    assert cha["source"] == "social"
+    assert [f["key"] for f in cha["factors"]] == ["interactions", "quality"]

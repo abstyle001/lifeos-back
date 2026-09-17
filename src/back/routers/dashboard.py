@@ -11,6 +11,7 @@ from ..database import get_db
 from ..models import DailyRecord, SocialInteraction, User
 from ..schemas import (
     Attributes,
+    AttributesExplainOut,
     DashboardOut,
     RecordOut,
     TodayStatus,
@@ -18,10 +19,33 @@ from ..schemas import (
     UserOut,
 )
 from ..security import get_current_user
-from ..services.attributes import compute_attributes, today_score
+from ..services.attributes import compute_attributes, explain_attributes, today_score
 from ..services.experience import calc_streak
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+
+@router.get("/attributes/explain", response_model=AttributesExplainOut)
+def attributes_explain(
+    db: Annotated[Session, Depends(get_db)],
+    current: Annotated[User, Depends(get_current_user)],
+) -> AttributesExplainOut:
+    """属性可解释：展示 INT/VIT/FOCUS/CHA 的基线、因子贡献与最终值。"""
+    records = list(
+        db.scalars(
+            select(DailyRecord)
+            .where(DailyRecord.user_id == current.id)
+            .order_by(DailyRecord.date)
+        )
+    )
+    social = list(
+        db.scalars(
+            select(SocialInteraction)
+            .where(SocialInteraction.user_id == current.id)
+            .order_by(SocialInteraction.date)
+        )
+    )
+    return AttributesExplainOut(**explain_attributes(records, social))
 
 
 @router.get("", response_model=DashboardOut)
